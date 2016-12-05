@@ -1,0 +1,854 @@
+package netkit.util;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+
+import netkit.graph.Edge;
+import netkit.graph.Graph;
+import netkit.graph.Node;
+
+public class ApproximateCentralities {
+    private Object lock = new Object();
+    public GraphMetrics metrics;
+    
+    public ApproximateCentrality alphaCentrality = new ApproximateAlphaCentrality();
+    public ApproximateCentrality weightedAlphaCentrality = new ApproximateAlphaCentrality(true);
+    public ApproximateCentrality la_alphaCentrality = new ApproximateLimitedAttentionAlphaCentrality();
+    public ApproximateCentrality la_weightedAlphaCentrality = new ApproximateLimitedAttentionAlphaCentrality(true);
+    public ApproximateCentrality pagerank = new ApproximatePagerank();
+    public ApproximateCentrality weightedPagerank = new ApproximatePagerank(true);
+    public ApproximateCentrality la_pagerank = new ApproximateLimitedAttentionPagerank();
+    public ApproximateCentrality la_weightedPagerank = new ApproximateLimitedAttentionPagerank(true);
+    
+    private Node[] nodes=null;
+    private double[] inDegree=null;
+    private double[] wInDegree=null;
+    private double[] degree=null;
+    private double[] wDegree=null;
+    
+    private double maxOutDegree = 0;
+    
+    final private double numN;
+    
+    public ApproximateCentralities(final GraphMetrics metrics) {
+	this.metrics = metrics;
+	numN = metrics.numNodes - metrics.getNumSingletons();
+    }
+    
+    public ApproximateCentrality[] getCentralities() {
+	return new ApproximateCentrality[]{
+	    alphaCentrality,
+	    la_alphaCentrality,
+	    weightedAlphaCentrality,
+	    la_weightedAlphaCentrality,
+	    pagerank,
+	    la_pagerank,
+	    weightedPagerank,
+	    la_weightedPagerank
+	};
+    }
+    
+    public ApproximateCentrality[] getAlphaCentralities() {
+	return new ApproximateCentrality[]{
+	    alphaCentrality,
+	    la_alphaCentrality,
+	    weightedAlphaCentrality,
+	    la_weightedAlphaCentrality
+	};
+    }
+    
+    public ApproximateCentrality[] getPagerankCentralities() {
+	return new ApproximateCentrality[]{
+	    pagerank,
+	    la_pagerank,
+	    weightedPagerank,
+	    la_weightedPagerank
+	};
+    }
+    
+    public abstract class ApproximateCentrality extends ComputeProcess {
+	protected double[] centrality=null;
+	protected double[] residual=null;
+	protected boolean[] active=null;
+	protected final boolean weighted;
+	protected double epsilon = Double.NaN;
+	protected double alpha = Double.NaN;
+	protected double delta = Double.NaN;
+	
+	protected ApproximateCentrality(final String name, final boolean weighted) {
+	    super(name);
+	    this.weighted=weighted;
+	}
+	
+	/**
+	 * Update the queue with the current node, returning the first node index which was added (if any)
+	 * @param node
+	 * @param queue
+	 * @return index of first node added or -1 if no node added
+	 */
+	protected abstract int updateQueue(final int node, final Queue<Integer> queue);
+	protected abstract Queue<Integer> initQueue();
+	protected abstract boolean init();
+	
+	/**
+	 * Validates settings such as alpha, delta, etc. and reset the centrality array + progress
+	 * if new GraphMetric settings are different
+	 */
+	protected abstract void validateSettings();
+	
+	/**
+	 * Get the centrality for the given node.
+	 * @return the centrality for the given node.
+	 */
+	public double getCentrality(final Node n) {
+	    return getCentrality(metrics.getNodeIndex(n));
+	}
+	
+	/**
+	 * Get the centrality for the given node.
+	 * @return the centrality for the given node.
+	 */
+	public double getCentrality(final int node) {
+	    validateSettings();
+	    if(progress!=1D) {
+		start();
+		if(progress!=1D)
+		    return Double.NaN;
+	    }
+	    return (centrality==null ? Double.NaN : centrality[node]);
+	}
+	
+	protected boolean setNodes() {
+	    if(nodes!=null) {
+		while(nodes[nodes.length-1]==null)
+		    try { Thread.sleep(50); } catch(Exception ex) {}
+		return true;
+	    }
+	    nodes = new Node[metrics.numNodes];
+	    for (final Node n : ((metrics.nodeType == null) ? metrics.graph.getNodes() : metrics.graph.getNodes(metrics.nodeType)))
+		{
+		    if(!active()) return false;
+		    nodes[metrics.getNodeIndex(n)] = n;
+		}
+	    return true;
+	}
+	
+	protected boolean setInDegree() {
+	    final int max=metrics.numNodes-1;
+	    if(inDegree!=null) {
+		while(inDegree[max]==-1)
+		    try { Thread.sleep(50); } catch(Exception ex) {}
+		return true;
+	    }
+	    
+	    synchronized(lock) {
+		inDegree = new double[metrics.numNodes];
+		Arrays.fill(inDegree,0D);
+		inDegree[max] = -1;
+		
+		wInDegree = new double[metrics.numNodes];
+		Arrays.fill(wInDegree,0D);
+	    }
+	    double in=0;
+	    for (final Node n : ((metrics.nodeType == null) ? metrics.graph.getNodes() : metrics.graph.getNodes(metrics.nodeType)))
+		{
+		    if(!active()) return false;
+		    for(final Edge e : (metrics.nodeType == null ? n.getEdges() : n.getEdgesToNeighbor(metrics.nodeType))) {
+			final int cIdx = metrics.getNodeIndex(e.getDest());
+			wInDegree[cIdx] += e.getWeight();
+			if(cIdx==max)
+			    in++;
+			else
+			    inDegree[cIdx]++;
+		    }
+		}
+	    inDegree[max] = in;
+	    return true;
+	}
+	
+	protected boolean setDegree() {
+	    final int max=metrics.numNodes-1;
+	    if(degree!=null) {
+		while(degree[max]==-1)
+		    try { Thread.sleep(50); } catch(Exception ex) {}
+		return true;
+	    }
+	    
+	    synchronized(lock) {
+		degree = new double[metrics.numNodes];
+		Arrays.fill(degree,0D);
+		degree[max] = -1;
+		
+		wDegree = new double[metrics.numNodes];
+		Arrays.fill(wDegree,0D);
+	    }
+	    double in=0;
+	    for (final Node n : ((metrics.nodeType == null) ? metrics.graph.getNodes() : metrics.graph.getNodes(metrics.nodeType)))
+		{
+		    if(!active()) return false;
+		    final int cIdx = metrics.getNodeIndex(n);
+		    wDegree[cIdx] = ((metrics.nodeType==null) ? nodes[cIdx].getWeightedDegree() : nodes[cIdx].getWeightedDegree(metrics.nodeType));
+		    
+		    final double d = ((metrics.nodeType==null) ? nodes[cIdx].getUnweightedDegree() : nodes[cIdx].getUnweightedDegree(metrics.nodeType)); 
+		    if(cIdx==max)
+			in = d;
+		    else
+			degree[cIdx] = d;
+		}
+	    degree[max] = in;
+	    return true;
+	}		
+	
+	private void clean() {
+	    logger.info(name()+" --- clean()");
+	    centrality=null;
+	    residual=null;
+	    nodes=null;
+	    active=null;
+	}
+	
+	/**
+	 */
+	@Override
+	    protected boolean run() {
+	    if(!init())
+		return false;
+	    
+	    logger.info(name()+": START Computing (alpha="+alpha+") |V|="+metrics.numNodes+" singletons="+metrics.getNumSingletons());
+	    
+	    residual = new double[metrics.numNodes]; 
+	    centrality = new double[metrics.numNodes];
+	    Arrays.fill(residual,0D);
+	    Arrays.fill(centrality,0D);
+	    
+	    Queue<Integer> queue = initQueue();
+	    if(queue==null) {
+		clean();
+		return false;
+	    }
+	    
+	    active = new boolean[metrics.numNodes];
+	    Arrays.fill(active,false);
+	    for(int node : queue) {
+		if(!active()) {
+		    clean();
+		    return false;
+		}
+		active[node]=true;
+	    }
+	    
+	    double nInc=0; // how many consecutive steps did residual increase?
+	    double tDiff=0; // what is total residual diff of all increases so far?
+	    double psum = VectorMath.sum(residual);
+	    logger.info(name()+" START Iterating QS="+queue.size()+" residual="+psum+" queueSize="+queue.size());
+	    int itStart = (queue.isEmpty() ? -1 : queue.peek());
+	    int numN=0;
+	    while(!queue.isEmpty()) {
+		if(!active()) {
+		    clean();
+		    return false;
+		}
+		numN++;
+		final int node = queue.poll();
+		active[node] = false;
+		
+		final int firstAdd = updateQueue(node,queue);
+		
+		if(itStart==node) {
+		    itStart = firstAdd;
+		    final double csum = VectorMath.sum(residual);
+		    double diff = csum-psum;
+		    if(diff>0) {
+			nInc++;
+			tDiff+=diff;
+		    } else {
+			nInc=0;
+			tDiff=0;
+		    }
+		    logger.info(name()+": "+((csum>psum)?"WARNING ":"")+"[a="+alpha+"] Node["+node+" ("+nodes[node].getName()+")] CR="+csum+" PR="+psum+" DR="+(csum-psum)+" QS="+queue.size()+" nInc="+nInc+" aDiff="+(tDiff/nInc));
+		    
+		    if(Double.isInfinite(csum)) {
+			logger.severe(name()+" is not converging.  Aborting.");
+			clean();
+			return false;
+		    }
+		    
+		    psum = csum;
+		    
+		    if(nInc>2) {
+			double aDiff = tDiff/nInc;
+			if(aDiff<diff || nInc>4) {
+			    logger.severe(name()+" is not converging.  Aborting.");
+			    clean();
+			    return false;
+			}
+		    }
+		    
+		    psum = csum;
+		    itStart=-1;
+		} else if(itStart==-1)
+		    itStart = firstAdd;
+	    }
+	    double csum = VectorMath.sum(residual);
+	    logger.info(name()+": FINAL: ["+numN+" nodes processed] "+((csum>psum)?"WARNING ":"")+"[a="+alpha+"] Node[-1 (NA)] CR="+csum+" PR="+psum+" DR="+(csum-psum)+" QS="+queue.size());
+	    
+	    cleanup();
+	    
+	    logger.info(name()+": DONE (alpha="+alpha+") [active="+active+" progress="+progress+")");
+	    
+	    return true;
+	}
+	
+	protected void cleanup() {
+	    logger.info(name()+" --- cleanup()");
+	    residual=null;
+	    active=null;
+	}
+    }
+    
+    
+    private class ApproximateAlphaCentrality extends ApproximateCentrality {
+	public ApproximateAlphaCentrality() {
+	    this(false);
+	}
+	public ApproximateAlphaCentrality(final boolean weighted) {
+	    super("Approximate"+(weighted?"Weighted":"")+"AlphaCentrality",weighted);
+	}
+	
+	@Override
+	    protected void validateSettings() {
+	    synchronized(lock) {
+		if(Double.isNaN(alpha) ||
+		   (!Double.isNaN(metrics.getAlphaCentralityAlpha()) &&
+		    alpha != metrics.getAlphaCentralityAlpha()) ||
+		   Double.isNaN(delta) ||
+		   (!Double.isNaN(metrics.getAlphaCentralityDelta()) &&
+		    delta < metrics.getAlphaCentralityDelta())) {
+		    centrality=null;
+		    progress=0D;
+		    this.stop(true);
+		}
+	    }
+	}
+	
+	@Override
+	    protected boolean init() {
+	    if(!setNodes())
+		return false;
+	    if(!setInDegree())
+		return false;
+	    
+	    // alpha should be <= c/d_max
+	    //       for c < 1 and d_max = max out-degree
+	    alpha=metrics.getAlphaCentralityAlpha();
+	    if(Double.isNaN(alpha)) {
+		// default c=0.5
+		//         alpha = c/d_max
+		if(!setDegree())
+		    return false;
+		final double[] ldegree = (weighted?wDegree:degree);
+		final double maxD = VectorMath.getMaxValue(ldegree);
+		alpha = 0.5 / maxD;
+		logger.info(name()+": Setting alpha="+alpha+" (maxDegree="+maxD+")");
+	    }
+	    
+	    // delta is an approximation paramter 0 < delta <= 1
+	    delta=metrics.getAlphaCentralityDelta();
+	    if(Double.isNaN(delta)) {
+		delta = 0.01;
+		logger.info(name()+": Setting delta="+delta);
+	    }
+	    
+	    epsilon = delta/(double)numN; // should be |s|*delta/numN, but |s|=1 since we normalize
+	    return true;
+	}
+	
+	@Override
+	    protected Queue<Integer> initQueue() {
+	    final double[] degree = (weighted?wInDegree:inDegree);
+	    double sum = VectorMath.sum(degree);
+	    
+	    Queue<Integer> queue = new LinkedList<Integer>();
+	    for(int i=0;i<degree.length;i++) {
+		if(!active())
+		    return null;
+		residual[i] = degree[i]/sum;
+		if(residual[i]>=epsilon) {
+		    queue.add(i);
+		}
+	    }
+	    return queue;
+	}
+	
+	@Override
+	    protected int updateQueue(final int node, final Queue<Integer> queue) {
+	    int add=-1;
+	    final double r = residual[node];
+	    residual[node]=0;
+	    
+	    final double T = alpha * r;
+	    centrality[node] += r;
+	    
+	    for(Edge e : ((metrics.nodeType == null) ? nodes[node].getEdges() : nodes[node].getEdgesToNeighbor(metrics.nodeType))) {
+		final int node2 = metrics.getNodeIndex(e.getDest());
+		double inc = T;
+		if(weighted) inc *= e.getWeight();
+		residual[node2] += inc;
+		if(residual[node2] >= epsilon && !active[node2]) {
+		    active[node2]=true;
+		    queue.add(node2);
+		    if(add==-1)
+			add=node2;
+		}
+	    }
+	    return add;
+	}
+    }
+    
+    private class ApproximatePagerank extends ApproximateCentrality {
+	double[] threshold;
+	double[] mult;
+	double alphaNeg;
+	
+	public ApproximatePagerank() {
+	    this(false);
+	}
+	public ApproximatePagerank(final boolean weighted) {
+	    super("Approximate"+(weighted?"Weighted":"")+"Pagerank",weighted);
+	}
+	
+	@Override
+	    protected void validateSettings() {
+	    synchronized(lock) {
+		if(Double.isNaN(alpha) ||
+		   (!Double.isNaN(metrics.getPagerankAlpha()) &&
+		    alpha != metrics.getPagerankAlpha()) ||
+		   Double.isNaN(delta) ||
+		   (!Double.isNaN(metrics.getPagerankDelta()) &&
+		    delta < metrics.getPagerankDelta())) {
+		    centrality=null;
+		    progress=0D;
+		    this.stop(true);
+		}
+	    }
+	}
+	
+	@Override
+	    protected boolean init() {
+	    if(!setNodes())
+		return false;
+	    if(!setDegree())
+		return false;
+	    
+	    final double[] ldegree = (weighted?wDegree:degree);
+	    final double maxD = VectorMath.getMaxValue(ldegree);
+	    
+	    alpha=metrics.getPagerankAlpha();
+	    if(Double.isNaN(alpha)) {
+		alpha = 0.9;
+		logger.info(name()+": Setting alpha="+alpha);
+	    }
+	    
+	    alphaNeg = (1D-alpha);
+	    
+	    // delta is an approximation paramter 0 < delta <= 1
+	    delta=metrics.getAlphaCentralityDelta();
+	    if(Double.isNaN(delta)) {
+		// default = 0.05
+		delta = 0.05;
+		logger.info(name()+": Setting delta="+delta);
+	    }
+	    
+	    epsilon = delta/(double)(numN*maxD);
+	    
+	    threshold = new double[metrics.numNodes];
+	    mult = new double[metrics.numNodes];
+	    return true;
+	}
+	
+	@Override
+	    protected Queue<Integer> initQueue() {
+	    final double[] ldegree = (weighted?wDegree:degree);
+	    
+	    Queue<Integer> queue = new LinkedList<Integer>();
+	    for(int i=0;i<degree.length;i++) {
+		if(!active())
+		    return null;
+		if(ldegree[i]==0)
+		    continue;
+		
+		threshold[i] = ldegree[i]*epsilon;
+		mult[i] = alphaNeg/ldegree[i];
+		residual[i] = 1D;
+		queue.add(i);
+	    }
+	    return queue;
+	}
+	
+	@Override
+	    protected int updateQueue(final int node, final Queue<Integer> queue) {
+	    int add=-1;
+	    final double r = residual[node];
+	    residual[node]=0;
+	    
+	    final double T = alpha * r;
+	    centrality[node] += T;
+	    
+	    final double inc = mult[node]*r;
+	    for(Edge e : ((metrics.nodeType == null) ? nodes[node].getEdges() : nodes[node].getEdgesToNeighbor(metrics.nodeType))) {
+		final int node2 = metrics.getNodeIndex(e.getDest());
+		residual[node2] += inc;
+		if(residual[node2] >= threshold[node2] && !active[node2]) {
+		    active[node2]=true;
+		    queue.add(node2);
+		    if(add==-1)
+			add=node2;
+		}
+	    }
+	    return add;
+	}
+	
+	@Override
+	    protected void cleanup() {
+	    super.cleanup();
+	    mult=null;
+	    threshold=null;
+	}
+    }
+    
+    private class ApproximateLimitedAttentionPagerank extends ApproximateCentrality {
+	double[] threshold;
+	double[] mult;
+	double[] lInDegree;
+	double alphaNeg;
+	double delta;
+	
+	public ApproximateLimitedAttentionPagerank() {
+	    this(false);
+	}
+	public ApproximateLimitedAttentionPagerank(final boolean weighted) {
+	    super("Approximate_LimitedAttention_"+(weighted?"Weighted":"")+"Pagerank",weighted);
+	}
+	
+	@Override
+	    protected void validateSettings() {
+	    synchronized(lock) {
+		if(alpha!=metrics.getPagerankAlpha() || delta<metrics.getPagerankDelta()) {
+		    centrality=null;
+		    progress=0D;
+		    this.stop(true);
+		}
+	    }
+	}
+	
+	@Override
+	    protected boolean init() {
+	    if(!setNodes())
+		return false;
+	    if(!setDegree())
+		return false;
+	    if(!setInDegree())
+		return false;
+	    
+	    final double[] ldegree = (weighted?wDegree:degree);
+	    lInDegree = (weighted?wInDegree:inDegree);
+	    
+	    final double maxD = VectorMath.getMaxValue(ldegree);
+	    delta = metrics.getPagerankDelta();
+	    alpha=metrics.getPagerankAlpha();
+	    alphaNeg = (1D-alpha);
+	    epsilon = delta/(double)(numN*maxD);
+	    
+	    threshold = new double[metrics.numNodes];
+	    mult = new double[metrics.numNodes];
+	    
+	    return true;
+	}
+	
+	@Override
+	    protected Queue<Integer> initQueue() {
+	    final double[] ldegree = (weighted?wDegree:degree);
+	    final double startVal = 1D/(double)numN;
+	    
+	    Queue<Integer> queue = new LinkedList<Integer>();
+	    for(int i=0;i<degree.length;i++) {
+		if(!active())
+		    return null;
+		if(ldegree[i]==0)
+		    continue;
+		
+		mult[i] = alpha/ldegree[i];
+		residual[i]=startVal;
+		threshold[i] = ldegree[i]*epsilon;
+		queue.add(i);
+	    }
+	    return queue;
+	}
+	
+	@Override
+	    protected int updateQueue(final int node, final Queue<Integer> queue) {
+	    int add=-1;
+	    final double r = residual[node];
+	    residual[node]=0;
+	    centrality[node] += alphaNeg*r;
+	    
+	    final double m = mult[node]*r;
+	    for(Edge e : ((metrics.nodeType == null) ? nodes[node].getEdges() : nodes[node].getEdgesToNeighbor(metrics.nodeType))) {
+		final int node2 = metrics.getNodeIndex(e.getDest());
+		residual[node2] += m/lInDegree[node2];
+		if(residual[node2] >= threshold[node2] && !active[node2]) {
+		    active[node2]=true;
+		    queue.add(node2);
+		    if(add==-1)
+			add=node2;
+		}
+	    }
+	    return add;
+	}
+	
+	@Override
+	    protected void cleanup() {
+	    super.cleanup();
+	    mult=null;
+	    threshold=null;
+	    lInDegree=null;
+	}
+    }
+    
+    private class ApproximateLimitedAttentionAlphaCentrality extends ApproximateCentrality {
+	double[] mult;
+	double[] lInDegree;
+	double maxD=1D;
+	double delta;
+	List<List<Integer>> nbrIn = null;
+	
+	public ApproximateLimitedAttentionAlphaCentrality() {
+	    this(false);
+	}
+	public ApproximateLimitedAttentionAlphaCentrality(final boolean weighted) {
+	    super("Approximate_LimitedAttention_"+(weighted?"Weighted":"")+"AlphaCentrality",weighted);
+	}
+	
+	@Override
+	    protected void validateSettings() {
+	    synchronized(lock) {
+		if(alpha!=metrics.getAlphaCentralityAlpha() || delta<metrics.getAlphaCentralityDelta()) {
+		    centrality=null;
+		    progress=0D;
+		    this.stop(true);
+		}
+	    }
+	}
+	
+	@Override
+	    protected boolean init() {
+	    if(!setNodes())
+		return false;
+	    if(!setInDegree())
+		return false;
+	    if(!setDegree())
+		return false;
+	    
+	    lInDegree = (weighted?wInDegree:inDegree);
+	    
+	    alpha=metrics.getAlphaCentralityAlpha();
+	    delta=metrics.getAlphaCentralityDelta();
+	    maxD = VectorMath.getMaxValue(lInDegree);
+	    epsilon = delta/(double)(numN*maxD);
+	    
+	    mult = new double[metrics.numNodes];
+	    
+	    return true;
+	}
+	
+	@Override
+	    protected Queue<Integer> initQueue() {
+	    Queue<Integer> queue = new LinkedList<Integer>();
+	    nbrIn = new ArrayList<List<Integer>>();
+	    
+	    for(int i=0;i<degree.length;i++) {
+		if(!active())
+		    return null;
+		nbrIn.add(new ArrayList<Integer>());
+	    }
+	    for(int i=0;i<degree.length;i++) {
+		if(!active())
+		    return null;
+		double start = 0;
+		for(Edge e : ((metrics.nodeType == null) ? nodes[i].getEdges() : nodes[i].getEdgesToNeighbor(metrics.nodeType))) {
+		    int node2 = metrics.getNodeIndex(e.getDest());
+		    if(lInDegree[node2]>0)
+			start += 1D/lInDegree[node2];
+		    List<Integer> list = nbrIn.get(node2);
+		    list.add(i);
+		}
+		mult[i] = alpha/lInDegree[i];
+		residual[i]=start;
+		if(start>epsilon)
+		    queue.add(i);
+	    }
+	    return queue;
+	}
+	
+	@Override
+	    protected int updateQueue(final int node, final Queue<Integer> queue) {
+	    int add=-1;
+	    final double r = residual[node];
+	    residual[node]=0;
+	    centrality[node] += r;
+	    
+	    final double m = mult[node]*r;
+	    List<Integer> nbrList = nbrIn.get(node);
+	    for(int node2 : nbrList) {
+		residual[node2] += m/lInDegree[node2];
+		if(residual[node2]/maxD >= epsilon && !active[node2]) {
+		    active[node2]=true;
+		    queue.add(node2);
+		    if(add==-1)
+			add=node2;
+		}
+	    }
+	    return add;
+	}
+	
+	@Override
+	    protected void cleanup() {
+	    super.cleanup();
+	    mult=null;
+	    lInDegree=null;
+	    nbrIn=null;
+	}
+    }
+    
+    private static void usage(final String msg) {
+	System.err.println("Usage: ApproximateCentralitities [-aa alphaCentraliyAlpha] [-pa pagerankAlpha] [-d delta] <schema-file> centrality ...");
+	System.err.println("   where centrality = alpha, la_alpha, pagerank, la_pagerank, w_alpha, w_la_alpha, w_pagerank, w_la_pagerank");
+	System.err.println("   default alphaCentralityAlpha = 0.01");
+	System.err.println("   default pagerankAlpha = 0.90");
+	System.err.println("   default delta = 0.01");
+	System.err.println();
+	if(msg!=null)
+	    System.err.println(msg);
+	System.exit(0);
+    }
+    
+    public static void main(String... args) {
+	if(args.length < 2)
+	    usage(null);
+	
+	double acAlpha = 0.01;
+	double prAlpha = 0.9;
+	double delta = 0.01;
+	
+	int i=0;
+	while(i<args.length && args[i].startsWith("-")) {
+	    final String opt = args[i].toLowerCase();
+	    i++;
+	    if(i==args.length)
+		usage("No value given for "+opt);
+	    if(opt.equals("-aa")) {
+		acAlpha = Double.parseDouble(args[i]);
+		i++;
+	    } else if(opt.equals("-pa")) {
+		prAlpha = Double.parseDouble(args[i]);
+		i++;
+	    } else if(opt.startsWith("-d")) {
+		delta = Double.parseDouble(args[i]);
+		i++;
+	    } else if(opt.startsWith("-h"))
+		usage(null);
+	    else
+		usage("Unknown option: "+opt);
+	}
+	
+	if(i>=args.length)
+	    usage("No schema file given!");
+	
+	final File f = new File(args[i++]);
+	
+	if(i>=args.length)
+	    usage("No centralities specified!");
+	
+	System.out.println("=========================================");
+	System.out.println("Reading graph from file "+f);
+	final Graph g = netkit.graph.io.SchemaReader.readSchema(f);
+	System.out.println("=========================================");
+	
+	GraphMetrics metrics = g.getMetrics();
+	metrics.setAlphaCentralityAlpha(acAlpha);
+	metrics.setPagerankAlpha(prAlpha);
+	metrics.setAlphaCentralityDelta(delta);
+	metrics.setPagerankDelta(delta);
+	
+	ApproximateCentralities ac = metrics.getApproximateCentralities();
+	
+	Node[] nodes = g.getNodes();
+	List<List<Double>> c = new ArrayList<List<Double>>();
+	for(int t=0;t<nodes.length;t++)
+	    c.add(new ArrayList<Double>());
+	List<String> hdr = new ArrayList<String>();
+	hdr.add("Name,Index");
+	while(i<args.length) {
+	    final String centrality = args[i].toLowerCase();
+	    System.err.println("Computing "+centrality);
+	    ApproximateCentrality l_centrality = null;
+	    if(centrality.startsWith("p")) {
+		hdr.add(",Pagerank");
+		l_centrality=ac.pagerank;
+	    } else if(centrality.startsWith("w_p")) {
+		hdr.add(",WeightedPagerank");
+		l_centrality=ac.weightedPagerank;
+	    } else if(centrality.startsWith("la_p")) {
+		hdr.add(",LA_Pagerank");
+		l_centrality=ac.la_pagerank;
+	    } else if(centrality.startsWith("w_la_p")) {
+		hdr.add(",LA_WeightedPagerank");
+		l_centrality=ac.la_weightedPagerank;
+	    } else if(centrality.startsWith("a")) {
+		hdr.add(",AlphaCentrality");
+		l_centrality=ac.alphaCentrality;
+	    } else if(centrality.startsWith("w_a")) {
+		hdr.add(",WeightedAlphaCentrality");
+		l_centrality=ac.weightedAlphaCentrality;
+	    } else if(centrality.startsWith("la_a")) {
+		hdr.add(",LA_AlphaCentrality");
+		l_centrality=ac.la_alphaCentrality;
+	    } else if(centrality.startsWith("w_la_a")) {
+		hdr.add(",LA_WeightedAlphaCentrality");
+		l_centrality=ac.la_weightedAlphaCentrality;
+	    }
+	    
+	    for(Node n : nodes) {
+		int idx = metrics.getNodeIndex(n);
+		List<Double> d = c.get(idx);
+		System.err.print(".");
+		double val = l_centrality.getCentrality(n);
+		d.add(val);
+	    }					
+	    System.err.println();
+	    
+	    i++;
+	    System.err.println("  --- done");
+	}
+	
+	System.err.println("Writing node centralities...");
+	for(String h : hdr)
+	    System.out.print(h);
+	System.out.println();
+	
+	for(Node n : nodes) {
+	    final int idx = metrics.getNodeIndex(n);
+	    final List<Double> l = c.get(idx);
+	    System.out.print(n.getName()+","+idx);
+	    for(double d : l) {
+		System.out.print(",");
+		System.out.print(d);
+	    }
+	    System.out.println();
+	}
+    }
+}

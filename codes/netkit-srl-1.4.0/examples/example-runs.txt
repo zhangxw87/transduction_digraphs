@@ -1,0 +1,128 @@
+# example-runs.txt
+# Copyright (C) 2008 Sofus A. Macskassy
+#
+# Part of the open-source Network Learning Toolkit
+# http://netkit-srl.sourceforge.net
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# $Id$
+#
+# =========================================================================
+#
+# Requirements:
+#    java must be in your path and must be version 1.5+
+#
+# The runs assume the following directory structure:
+#    <some-path>/NetKit/lib/<all netkit jar files and property files>
+#    <some-path>/NetKit/examples/<example files>
+#
+# The runs assume that the NetKit jarfile is named:
+#    NetKit.jar
+#
+# The runs assume you are in the directory:
+#    <some-path>/NetKit/examples
+#
+# NetKit currently sends logging output to STDOUT.
+# Unless otherwise specified (-output), predictions will also go to STDOUT.
+#
+# The parameters given below as single examples can be combined
+# to your own specifications.
+
+
+# ------------------------------------------------------------------------
+# run NetKit with no parameters to get help:
+# ------------------------------------------------------------------------
+java -jar ../lib/NetKit.jar
+
+# ------------------------------------------------------------------------
+# BASIC RUN (10-fold CV, or whichever is the max number of nodes)
+# Run NetKit basic (see NetKit.properties for default paramater settings).
+# ------------------------------------------------------------------------
+java -jar ../lib/NetKit.jar goodbad-schema.arff
+
+# ------------------------------------------------------------------------
+# SETTING OUTPUT PREDICTION FILE
+# Run NetKit basic but redirecting output
+# ------------------------------------------------------------------------
+java -jar ../lib/NetKit.jar -output goodbad-out goodbad-schema.arff
+
+# ------------------------------------------------------------------------
+# K-FOLD CROSS-VALIDATION (k=4 in this example) (-runs k)
+# ------------------------------------------------------------------------
+java -jar ../lib/NetKit.jar -runs 4 goodbad-schema.arff
+
+# ------------------------------------------------------------------------
+# k RUNS WITH ARBITRARY SAMPLING: (-runs k -sample r)
+# in this example we perform 20 runs (default would be 10), each time
+# sampling 25% of the nodes for training
+# ------------------------------------------------------------------------
+java -jar ../lib/NetKit.jar -runs 20 -sample 0.25 goodbad-schema.arff
+
+# ------------------------------------------------------------------------
+# LEAVE-ONE-OUT (-loo)
+# ------------------------------------------------------------------------
+java -jar ../lib/NetKit.jar -loo goodbad-schema.arff
+
+# ------------------------------------------------------------------------
+# CUSTOM PREDICTION OUTPUT
+# run NetKit with a custom prediction output format: (-format "...")
+# ------------------------------------------------------------------------
+java -jar ../lib/NetKit.jar -format "(insert GOOD with score %Good into table blah)" goodbad-schema.arff
+
+# ------------------------------------------------------------------------
+# SPECIFIC TRAIN/TEST SPLIT (-known <csv-file>)
+# run NetKit using a custom split by specifying up front what the
+# training (known) nodes are:
+# ------------------------------------------------------------------------
+java -jar ../lib/NetKit.jar -known goodbad-known.csv goodbad-schema.arff
+
+# ------------------------------------------------------------------------
+# EXOGENOUS TRUTH FILE (-truth <csv-file>)
+# run NetKit using a custom truth:
+# ------------------------------------------------------------------------
+java -jar ../lib/NetKit.jar -truth goodbad-truth.csv goodbad-schema.arff
+
+# ------------------------------------------------------------------------
+# EXOGENOUS CLASS PRIOR (overrides training class prior):
+# ------------------------------------------------------------------------
+java -jar ../lib/NetKit.jar -vprior classprior goodbad-schema.arff
+
+# ------------------------------------------------------------------------
+# CUSTOM PERFORMANCE REPORTING
+# run NetKit and tell it to report:
+#    - AUC for each class (-showauc)
+#    - accuracy at each inference iteration (-showitacc)
+#    - AUC + save the ROC curves for each class (-saveroc)
+# ------------------------------------------------------------------------
+java -jar ../lib/NetKit.jar -showauc goodbad-schema.arff
+java -jar ../lib/NetKit.jar -showitauc goodbad-schema.arff
+java -jar ../lib/NetKit.jar -saveroc goodbad-schema.arff
+
+# ------------------------------------------------------------------------
+# CUSTOM PERFORMANCE REPORTING
+# run NetKit and tell it to report (these will work _only_ if the truth
+# is known):
+#    - assortativity (-showassort)
+#    - AUC for each class (-showauc)
+#    - accuracy at each inference iteration (-showitacc)
+#    - AUC + save the ROC curves for each class (-saveroc)
+#        NOTE: default output for -saveroc are in the files:
+#            roc-<class>-<run-#>.roc
+#        If you specify -output stem then the ROC curves are saved in:
+#            <stem>-<class>-<run-#>.roc
+# ------------------------------------------------------------------------
+java -jar ../lib/NetKit.jar -showassort goodbad-schema.arff
+java -jar ../lib/NetKit.jar -showauc goodbad-schema.arff
+java -jar ../lib/NetKit.jar -showitauc goodbad-schema.arff
+java -jar ../lib/NetKit.jar -saveroc goodbad-schema.arff

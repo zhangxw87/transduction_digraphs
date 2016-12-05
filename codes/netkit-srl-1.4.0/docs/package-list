@@ -1,0 +1,14 @@
+netkit
+netkit.classifiers
+netkit.classifiers.active
+netkit.classifiers.active.graphfunctions
+netkit.classifiers.aggregators
+netkit.classifiers.bayes
+netkit.classifiers.io
+netkit.classifiers.nonrelational
+netkit.classifiers.relational
+netkit.graph
+netkit.graph.edgecreator
+netkit.graph.io
+netkit.inference
+netkit.util

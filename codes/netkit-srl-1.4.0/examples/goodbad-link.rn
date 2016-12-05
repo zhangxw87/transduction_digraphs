@@ -1,0 +1,12 @@
+personA,personB,3
+personA,personC,4
+personA,personF,2
+personB,personC,2
+personB,personF,2
+personC,personD,1
+personC,personE,1
+personC,personF,2
+personD,personE,3
+personF,personG,2
+personF,personH,2
+personG,personH,2

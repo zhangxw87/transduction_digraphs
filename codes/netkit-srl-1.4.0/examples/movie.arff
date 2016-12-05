@@ -1,0 +1,34 @@
+@nodetype Movie
+@attribute Name KEY
+@attribute Genre {Comedy, Drama, Action, Horror}
+% @attribute Oscars IGNORE
+% The "Success" field should have these tokens in the instance file: {Dud, Average, Blockbuster}
+@attribute Success CATEGORICAL
+@nodedata movie.csv
+
+@nodetype Actor
+@attribute Name KEY
+% @attribute Age IGNORE
+@attribute BirthYear INT
+@nodedata actor.csv
+
+% Test @relation as an alias for @nodetype.
+@relation Studio
+@attribute Name KEY
+% @attribute Budget IGNORE
+% Test a hard coded path and @data tag
+@data studio.csv
+
+@edgetype HasActor Movie Actor
+@Reversible ActsIn
+@edgedata mov2act.rn
+
+@edgetype ProducedBy Movie Studio
+@Reversible Produces
+@edgedata mov2std.rn
+
+% Test an unnamed @reversible tag.
+@edgetype ActsWith Actor Actor
+@reversible
+% Test a hard coded path
+@edgedata act2std.rn

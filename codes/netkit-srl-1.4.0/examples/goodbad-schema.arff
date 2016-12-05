@@ -1,0 +1,8 @@
+@nodetype Person
+@attribute Name KEY
+@attribute Behaviour {Good, Bad}
+@nodedata goodbad-truth.csv
+
+@edgetype Linked Person Person
+@Reversible
+@edgedata goodbad-link.rn

@@ -1,0 +1,6 @@
+@nodetype paper
+@attribute id KEY
+@attribute class {1,2,3,4,5,6}
+@nodedata citeseerX_truth.csv
+@edgetype citation paper paper
+@edgedata citeseerX_edge.rn

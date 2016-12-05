@@ -1,0 +1,79 @@
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning setOptions
+INFO: Will read known labels from goodbad-known.csv
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning setOptions
+INFO: Will use relational classifier prn
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning setOptions
+INFO: Will calculate AUCs.
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning setOptions
+INFO: Using schema file=goodbad-schema.arff
+Oct 25, 2013 4:03:30 PM netkit.util.NetKitEnv logTime
+INFO: Time-from-start: 0 [starting netkit]
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning getGraph
+INFO: Read graph from 'goodbad-schema.arff'
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning getGraph
+INFO:    8 nodes
+
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning getGraph
+INFO:    24 edges
+
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning getAttribute
+INFO: attribute not set... use last attribute in 'Person'
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning setupExperiment
+INFO: Classify(NodeType:Attribute): Person:Behaviour
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning getClassification
+INFO: Reading labels from: goodbad-known.csv
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning getClassification
+INFO: Read known entities from 'goodbad-known.csv'
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning setOutputFormat
+INFO: Using output format='%ID %PREDICTION %ESTIMATE!Good %ESTIMATE!Bad'
+Oct 25, 2013 4:03:30 PM netkit.util.NetKitEnv logTime
+INFO: Time-from-start: 0 [after setupExperiment]
+Oct 25, 2013 4:03:30 PM netkit.util.NetKitEnv logTime
+INFO: Time-from-start: 0 [after initial assortativity computations]
+Oct 25, 2013 4:03:30 PM netkit.inference.InferenceMethod configure
+CONFIG:    netkit.inference.RelaxationLabeling configure: numit=99
+Oct 25, 2013 4:03:30 PM netkit.inference.RelaxationLabeling configure
+CONFIG:    netkit.inference.RelaxationLabeling configure: beta=1.0
+Oct 25, 2013 4:03:30 PM netkit.inference.RelaxationLabeling configure
+CONFIG:    netkit.inference.RelaxationLabeling configure: decay=0.99
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning runInference
+INFO: Running validation run 1 of 1
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearner setup
+INFO: Induced local classifier:
+ClassPrior (Non-Relational Classifier)
+-------------------------------------
+Good: 0.5
+Bad: 0.5
+
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearner setup
+INFO: Induced relational classifier:
+pRN (Relational Classifier)
+----------------------------------------
+[[ Bad Model -- Learning still not implemented ]]
+
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearner getEstimate
+INFO: Run inferenceMethod [netkit.inference.RelaxationLabeling] on 6 nodes
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning runInference
+INFO: Outputting predictions for run 1 of 1
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning runInference
+INFO: Done!
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning runInference
+INFO: ConfusionMatrix-1:
+             00     01
+Good 00:      5      0 : (5 correct of 5) (accuracy: 1)
+ Bad 01:      0      1 : (1 correct of 1) (accuracy: 1)
+  TOTAL:      5      1 : (6 correct of 6) (accuracy: 1)
+
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning runInference
+INFO: Accuracy-1: 1.0
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning runInference
+INFO: ConfusionMatrix-Final:
+             00     01
+Good 00:      5      0 : (5 correct of 5) (accuracy: 1)
+ Bad 01:      0      1 : (1 correct of 1) (accuracy: 1)
+  TOTAL:      5      1 : (6 correct of 6) (accuracy: 1)
+
+Oct 25, 2013 4:03:30 PM netkit.classifiers.NetworkLearning runInference
+INFO: Accuracy-Final: 1.0 (0.0) base=0.75 sigTest=0.0
+Oct 25, 2013 4:03:30 PM netkit.util.NetKitEnv logTime
+INFO: Time-from-start: 0 [after complete run]

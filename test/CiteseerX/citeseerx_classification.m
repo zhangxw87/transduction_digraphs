@@ -54,12 +54,6 @@ for i=1:m
     node_path{i} = find(W(i,:)~=0);
 end
 
-% find the path for each node
-node_path = cell(1,m);
-for i=1:m
-    node_path{i} = find(W(i,:)~=0);
-end
-
 % experiments on different percentages of labelled data
 ratio = 0.1:0.1:0.9; % percentage of labelled data
 ratio_len = length(ratio);

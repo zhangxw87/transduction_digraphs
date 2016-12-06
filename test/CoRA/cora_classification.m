@@ -45,12 +45,6 @@ for i=1:m
     node_path{i} = find(W(i,:)~=0);
 end
 
-% find the path for each node
-node_path = cell(1,m);
-for i=1:m
-    node_path{i} = find(W(i,:)~=0);
-end
-
 fprintf('SoP...\n')
 theta = 1; kernelID = 2;
 [W_SoP, Ksop, time_SoPW, time_SoP] = SoPCovariance(W, theta, kernelID);

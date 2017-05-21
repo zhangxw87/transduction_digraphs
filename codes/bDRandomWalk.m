@@ -35,17 +35,21 @@ F = zeros(nr, NumClass);
 for i = 1:NumClass
     % backward vector
     yc = Y(:,i);
+    
+    Wc = W;
+    Wc(logical(yc),:) = 0;
+    
     beta = zeros(nr, MaxIter+1);
     beta(:,end) = yc;
     for j = MaxIter:-1:1
-        beta(:,j) = W * beta(:,j+1) + yc;
+        beta(:,j) = Wc * beta(:,j+1) + yc;
     end
     
     % forward vector
     alpha = zeros(nr, MaxIter);
     alpha(:,1) = W' * yc;
     for j = 1:MaxIter-1
-        alpha(:,j+1) = W' * alpha(:,j);
+        alpha(:,j+1) = Wc' * alpha(:,j);
     end
     
     F(:,i) = sum(alpha .* beta(:, 2:end), 2) / (yc' * beta(:, 1));

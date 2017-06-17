@@ -25,9 +25,15 @@ ratio = 0.1:0.1:0.9; % percentage of labelled data
 ratio_len = length(ratio);
 Rept = 10; % number of repetitions of experiments
 
+% cross-validation candidate set for bNRWR and aNRL
+alphaSet = 0.1:0.1:0.9;
+MaxIterSet = 2 .^ (1:5);
+
 % calculate accuracy results
 DiGraphARW_Result.accuracy = zeros(Rept,ratio_len);
 DiGraphARW_Result.time = zeros(Rept,ratio_len);
+bNRWR_Result = DiGraphARW_Result;
+aNRL_Result = DiGraphARW_Result;
 
 samples = cell(Rept, ratio_len);
 for j=1:Rept
@@ -64,11 +70,28 @@ for j=1:Rept
         % DiGraphARW
         alpha = 0.1;
         [H, DiGraphARW_Result.time(j,i)] = DiGraphARW(W, Y, alpha);  
-        DiGraphARW_Result.accuracy(j,i) = microAC(class_label_number', H, covered_nodes_mat);    
+        DiGraphARW_Result.accuracy(j,i) = microAC(class_label_number', H, covered_nodes_mat);
+        
+        % bNRWR
+        fprintf('bNRWR...\n');
+        alpha = 0.1; MaxIter = 4;
+        time_cv = 0;
+        t = tic;
+        S_bNRWR = bNRWR(W, Y, alpha, MaxIter);
+        bNRWR_Result.time(j,i) = toc(t) + time_cv;
+        bNRWR_Result.accuracy(j,i) = microAC(class_label_number', S_bNRWR, covered_nodes_mat);
+                                                                                                          
+  
+        % aNRL
+        fprintf('aNRL...\n');
+        t = tic;
+        H_aNRL = aNRL(W, Y, alpha, MaxIter);
+        aNRL_Result.time(j,i) = toc(t) + time_cv;
+        aNRL_Result.accuracy(j,i) = microAC(class_label_number', H_aNRL, covered_nodes_mat);
     end
 end
 
-save ../../results/US_patent_result.mat samples DiGraphARW_Result;
+save ../../results/US_patent_result.mat samples DiGraphARW_Result bNRWR_Result aNRL_Result;
 
 %================ NetKit methods ================
 [citing_id, cited_id, ~] = find(W);

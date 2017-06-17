@@ -36,6 +36,10 @@ ratio = 0.1:0.1:0.9; % percentage of labelled data
 ratio_len = length(ratio);
 Rept = 50; % number of repetitions of experiments
 
+% cross-validation candidate set for bNRWR and aNRL
+alphaSet = 0.1:0.1:0.9;
+MaxIterSet = 2 .^ (1:5);
+
 % calculate accuracy results
 DiGraphARW_Result.accuracy = zeros(Rept,ratio_len);
 DiGraphARW_Result.time = zeros(Rept,ratio_len);
@@ -43,6 +47,10 @@ SGL_Result = DiGraphARW_Result;
 CTK_Result = DiGraphARW_Result;
 RCTK_Result = DiGraphARW_Result;
 ZFL_Result = DiGraphARW_Result;
+bNRWR_Result = DiGraphARW_Result;
+bNRWR_Result.time_cv = zeros(Rept,ratio_len);
+aNRL_Result = DiGraphARW_Result;
+aNRL_Result.time_cv = zeros(Rept,ratio_len);
 
 samples = cell(Rept, ratio_len);
 for j=1:Rept
@@ -105,11 +113,33 @@ for j=1:Rept
         alpha = 1;
         [H_ZFL, ZFL_Result.time(j,i) ] = ZFL(W, Y, alpha);
         ZFL_Result.accuracy(j,i) = microAC(class_label_number', H_ZFL, covered_nodes_mat);
+        
+        % bNRWR
+        fprintf('bNRWR...\n');
+        [alpha, MaxIter, time_cv] = bNRWR_cv(W(label_ind,label_ind), class_label_number(label_ind),...
+                                             alphaSet, MaxIterSet);
+        fprintf('The optimal parameters for bNRWR are alpha = %.2f, MaxIter = %d \n', alpha, MaxIter); 
+        bNRWR_Result.time_cv(j,i) = time_cv;
+        t = tic;
+        S_bNRWR = bNRWR(W, Y, alpha, MaxIter);
+        bNRWR_Result.time(j,i) = toc(t);
+        bNRWR_Result.accuracy(j,i) = microAC(class_label_number', S_bNRWR, covered_nodes_mat);
+
+        % aNRL
+        fprintf('aNRL...\n');
+        [alpha, MaxIter, time_cv] = aNRL_cv(W(label_ind,label_ind), class_label_number(label_ind),...
+                                            alphaSet, MaxIterSet);  
+        fprintf('The optimal parameters for aNRL are alpha = %.2f, MaxIter = %d \n', alpha, MaxIter);
+        aNRL_Result.time_cv(j,i) = time_cv;
+        t = tic;
+        H_aNRL = aNRL(W, Y, alpha, MaxIter);
+        aNRL_Result.time(j,i) = toc(t);
+        aNRL_Result.accuracy(j,i) = microAC(class_label_number', H_aNRL, covered_nodes_mat);
     end
 end
 
 save ../../results/News20_result.mat samples DiGraphARW_Result SGL_Result CTK_Result ...
-    RCTK_Result ZFL_Result;
+    RCTK_Result ZFL_Result bNRWR_Result aNRL_Result;
 
 %================ NetKit methods ================
 [citing_id, cited_id, ~] = find(W);

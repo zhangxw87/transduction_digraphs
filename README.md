@@ -34,7 +34,7 @@ is borrowed from the authors of [9].
 Take CiteseerX dataset for example. Proceed to folder `test/CiteseerX/`, and execute `run_citeseerX.m` in the command window of MATLAB. 
 
 ## Reference
-[1] Jaydeep De, Xiaowei Zhang, Feng Lin, and Li Cheng, [Transduction on Directed Graphs via Absorbing Random Walks](), submitted, 2015.
+[1] Jaydeep De, Xiaowei Zhang, Feng Lin, and Li Cheng, [Transduction on Directed Graphs via Absorbing Random Walks](http://ieeexplore.ieee.org/abstract/document/8008851/), IEEE Transactions on Pattern Analysis and Machine Intelligence, 2017.
 
 [2] F. Fouss, K. Francoisse, L. Yen, A. Pirotte, and M. Saerens, [An
 experimental investigation of kernels on graphs for collaborative recommendation and semisupervised classification](http://www.sciencedirect.com/science/article/pii/S0893608012000822), Neural Network, vol. 31, pp. 53 -- 72, 2012.
